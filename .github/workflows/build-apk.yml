@@ -1,0 +1,99 @@
+name: Build Kashmir Vegitable APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.35.7"
+          cache: true
+
+      - name: Create Flutter project
+        run: |
+          flutter create --org com.kashmirvegitable --project-name kashmir_vegitable build_app
+
+      - name: Copy app files
+        run: |
+          cp pubspec.yaml build_app/pubspec.yaml
+          cp main.dart build_app/lib/main.dart
+          mkdir -p build_app/android/app
+          cp google-services.json build_app/android/app/google-services.json
+
+      - name: Configure Android package
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("build_app/android/app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace(
+              'namespace = "com.example.kashmir_vegitable"',
+              'namespace = "com.kashmirvegitable.app"'
+          )
+          s = s.replace(
+              'applicationId = "com.example.kashmir_vegitable"',
+              'applicationId = "com.kashmirvegitable.app"'
+          )
+          p.write_text(s)
+          PY
+
+      - name: Generate Firebase options
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.load(open("google-services.json"))
+          project = data["project_info"]
+          client = next(
+              c for c in data["client"]
+              if c["client_info"]["android_client_info"]["package_name"]
+              == "com.kashmirvegitable.app"
+          )
+
+          app = client["client_info"]["mobilesdk_app_id"]
+          api_key = client["api_key"][0]["current_key"]
+
+          dart = f"""import 'package:firebase_core/firebase_core.dart';
+
+          class DefaultFirebaseOptions {{
+            static FirebaseOptions get currentPlatform {{
+              return const FirebaseOptions(
+                apiKey: '{api_key}',
+                appId: '{app}',
+                messagingSenderId: '{project["project_number"]}',
+                projectId: '{project["project_id"]}',
+                storageBucket: '{project["storage_bucket"]}',
+              );
+            }}
+          }}
+          """
+
+          Path("build_app/lib/firebase_options.dart").write_text(dart)
+          PY
+
+      - name: Get packages
+        working-directory: build_app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: build_app
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kashmir-Vegitable-APK
+          path: build_app/build/app/outputs/flutter-apk/app-release.apk
