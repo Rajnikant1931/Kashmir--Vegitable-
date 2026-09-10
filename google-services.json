@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "684311976233",
+    "project_id": "kashmir-vegitable-5ebdb",
+    "storage_bucket": "kashmir-vegitable-5ebdb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684311976233:android:8fc179346b0131536fbf38",
+        "android_client_info": {
+          "package_name": "app.kashmirvegitable.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1hqznMupkQnNCwoVexvrxyZy7gd2coJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684311976233:android:b6c8f202da8a15506fbf38",
+        "android_client_info": {
+          "package_name": "com.kashmirvegitable.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1hqznMupkQnNCwoVexvrxyZy7gd2coJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
