@@ -25,6 +25,24 @@ jobs:
         run: |
           flutter create --org com.kashmirvegitable --project-name kashmir_vegitable build_app
 
+      - name: Fix Kotlin version
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("build_app/android/settings.gradle.kts")
+          s = p.read_text()
+
+          s = re.sub(
+              r'id\("org\.jetbrains\.kotlin\.android"\)\s+version\s+"[^"]+"',
+              'id("org.jetbrains.kotlin.android") version "2.3.0"',
+              s
+          )
+
+          p.write_text(s)
+          PY
+
       - name: Copy app files
         run: |
           cp pubspec.yaml build_app/pubspec.yaml
@@ -36,16 +54,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p = Path("build_app/android/app/build.gradle.kts")
           s = p.read_text()
+
           s = s.replace(
               'namespace = "com.example.kashmir_vegitable"',
               'namespace = "com.kashmirvegitable.app"'
           )
+
           s = s.replace(
               'applicationId = "com.example.kashmir_vegitable"',
               'applicationId = "com.kashmirvegitable.app"'
           )
+
           p.write_text(s)
           PY
 
@@ -57,6 +79,7 @@ jobs:
 
           data = json.load(open("google-services.json"))
           project = data["project_info"]
+
           client = next(
               c for c in data["client"]
               if c["client_info"]["android_client_info"]["package_name"]
