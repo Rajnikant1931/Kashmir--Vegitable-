@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -47,7 +47,7 @@ jobs:
         run: |
           cp pubspec.yaml build_app/pubspec.yaml
           cp main.dart build_app/lib/main.dart
-          mkdir -p build_app/android/app
+          mkdir -p build_app/android/app/src/main
           cp google-services.json build_app/android/app/google-services.json
 
       - name: Configure Android package
@@ -71,40 +71,91 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Fix Kotlin compiler options
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("build_app/android/app/build.gradle.kts")
+          s = p.read_text()
+
+          pattern = r'\n\s*kotlinOptions\s*\{\s*jvmTarget\s*=\s*JavaVersion\.VERSION_11\.toString\(\)\s*\}'
+
+          replacement = '''
+              kotlin {
+                  compilerOptions {
+                      jvmTarget.set(
+                          org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+                      )
+                  }
+              }
+          '''
+
+          s, count = re.subn(pattern, replacement, s, flags=re.MULTILINE)
+
+          if count == 0:
+              print("Old kotlinOptions block not found; continuing.")
+          else:
+              print("Kotlin compilerOptions fixed.")
+
+          p.write_text(s)
+          PY
+
       - name: Generate Firebase options
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
 
-          data = json.load(open("google-services.json"))
-          project = data["project_info"]
-
-          client = next(
-              c for c in data["client"]
-              if c["client_info"]["android_client_info"]["package_name"]
-              == "com.kashmirvegitable.app"
+          data = json.loads(
+              Path("build_app/android/app/google-services.json").read_text()
           )
 
-          app = client["client_info"]["mobilesdk_app_id"]
-          api_key = client["api_key"][0]["current_key"]
+          project = data["project_info"]
+          client = None
 
-          dart = f"""import 'package:firebase_core/firebase_core.dart';
+          for c in data["client"]:
+              package_name = c["client_info"]["android_client_info"]["package_name"]
+              if package_name == "com.kashmirvegitable.app":
+                  client = c
+                  break
 
-          class DefaultFirebaseOptions {{
-            static FirebaseOptions get currentPlatform {{
-              return const FirebaseOptions(
-                apiKey: '{api_key}',
-                appId: '{app}',
-                messagingSenderId: '{project["project_number"]}',
-                projectId: '{project["project_id"]}',
-                storageBucket: '{project["storage_bucket"]}',
-              );
-            }}
-          }}
-          """
+          if client is None:
+              raise SystemExit(
+                  "Firebase Android client for com.kashmirvegitable.app not found."
+              )
 
-          Path("build_app/lib/firebase_options.dart").write_text(dart)
+          app_id = client["client_info"]["mobilesdk_app_id"]
+
+          api_key = None
+          for key in client.get("api_key", []):
+              if key.get("current_key"):
+                  api_key = key["current_key"]
+                  break
+
+          if not api_key:
+              raise SystemExit("Firebase API key not found.")
+
+          content = f"""import 'package:firebase_core/firebase_core.dart';
+
+class DefaultFirebaseOptions {{
+  static FirebaseOptions get currentPlatform {{
+    return android;
+  }}
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: '{api_key}',
+    appId: '{app_id}',
+    messagingSenderId: '{project["project_number"]}',
+    projectId: '{project["project_id"]}',
+    storageBucket: '{project["storage_bucket"]}',
+  );
+}}
+"""
+
+          Path("build_app/lib/firebase_options.dart").write_text(content)
+          print("Firebase options generated successfully.")
           PY
 
       - name: Get packages
@@ -120,3 +171,4 @@ jobs:
         with:
           name: Kashmir-Vegitable-APK
           path: build_app/build/app/outputs/flutter-apk/app-release.apk
+
