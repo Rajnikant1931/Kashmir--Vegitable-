@@ -83,21 +83,23 @@ jobs:
           pattern = r'\n\s*kotlinOptions\s*\{\s*jvmTarget\s*=\s*JavaVersion\.VERSION_11\.toString\(\)\s*\}'
 
           replacement = '''
-              kotlin {
-                  compilerOptions {
-                      jvmTarget.set(
-                          org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
-                      )
-                  }
+          kotlin {
+              compilerOptions {
+                  jvmTarget.set(
+                      org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+                  )
               }
+          }
           '''
 
-          s, count = re.subn(pattern, replacement, s, flags=re.MULTILINE)
+          s, count = re.subn(
+              pattern,
+              replacement,
+              s,
+              flags=re.MULTILINE
+          )
 
-          if count == 0:
-              print("Old kotlinOptions block not found; continuing.")
-          else:
-              print("Kotlin compilerOptions fixed.")
+          print("Kotlin compiler options fixed:", count)
 
           p.write_text(s)
           PY
@@ -123,7 +125,7 @@ jobs:
 
           if client is None:
               raise SystemExit(
-                  "Firebase Android client for com.kashmirvegitable.app not found."
+                  "Firebase Android client not found."
               )
 
           app_id = client["client_info"]["mobilesdk_app_id"]
@@ -137,24 +139,31 @@ jobs:
           if not api_key:
               raise SystemExit("Firebase API key not found.")
 
-          content = f"""import 'package:firebase_core/firebase_core.dart';
+          project_number = project["project_number"]
+          project_id = project["project_id"]
+          storage_bucket = project["storage_bucket"]
 
-class DefaultFirebaseOptions {{
-  static FirebaseOptions get currentPlatform {{
-    return android;
-  }}
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: '{api_key}',
-    appId: '{app_id}',
-    messagingSenderId: '{project["project_number"]}',
-    projectId: '{project["project_id"]}',
-    storageBucket: '{project["storage_bucket"]}',
-  );
-}}
-"""
+          content = "\n".join([
+              "import 'package:firebase_core/firebase_core.dart';",
+              "",
+              "class DefaultFirebaseOptions {",
+              "  static FirebaseOptions get currentPlatform {",
+              "    return android;",
+              "  }",
+              "",
+              "  static const FirebaseOptions android = FirebaseOptions(",
+              f"    apiKey: {json.dumps(api_key)},",
+              f"    appId: {json.dumps(app_id)},",
+              f"    messagingSenderId: {json.dumps(project_number)},",
+              f"    projectId: {json.dumps(project_id)},",
+              f"    storageBucket: {json.dumps(storage_bucket)},",
+              "  );",
+              "}",
+              ""
+          ])
 
           Path("build_app/lib/firebase_options.dart").write_text(content)
+
           print("Firebase options generated successfully.")
           PY
 
@@ -171,4 +180,3 @@ class DefaultFirebaseOptions {{
         with:
           name: Kashmir-Vegitable-APK
           path: build_app/build/app/outputs/flutter-apk/app-release.apk
-
